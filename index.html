@@ -9,37 +9,33 @@
 <body>
   <div id="app">
     <header class="topbar">
-      <div class="title">Prototype</div>
-      <div class="sub" id="stepLabel">Step 1</div>
+      <button id="homeBtn" class="iconBtn" type="button" aria-label="ホーム">🏠</button>
+      <div>
+        <div class="title">Prototype</div>
+      </div>
     </header>
 
     <main id="screen" class="screen"></main>
 
     <footer class="bottombar">
-      <footer class="nav">
-    <button class="navItem active" data-tab="home">
-        <div class="navIcon">🏠</div>
-        <div class="navLabel">ホーム</div>
-    </button>
-    <button class="navItem" data-tab="recruit">
-        <div class="navIcon">👥</div>
-        <div class="navLabel">採用</div>
-    </button>
-
-    <button class="navItem" data-tab="base">
-        <div class="navIcon">🏠</div>
-        <div class="navLabel">拠点</div>
-    </button>
-
-    <button class="navItem active" data-tab="work">
-        <div class="navIcon">💼</div>
-        <div class="navLabel">仕事</div>
-    </button>
-
-    <button class="navItem" data-tab="story">
-        <div class="navIcon">📖</div>
-        <div class="navLabel">ストーリー</div>
-    </button>
+      <nav class="nav" aria-label="Bottom Navigation">
+        <button class="navItem" data-tab="recruit" type="button">
+          <div class="navIcon">👥</div>
+          <div class="navLabel">人事</div>
+        </button>
+        <button class="navItem" data-tab="base" type="button">
+          <div class="navIcon">🏠</div>
+          <div class="navLabel">拠点</div>
+        </button>
+        <button class="navItem" data-tab="work" type="button">
+          <div class="navIcon">💼</div>
+          <div class="navLabel">仕事</div>
+        </button>
+        <button class="navItem" data-tab="story" type="button">
+          <div class="navIcon">📖</div>
+          <div class="navLabel">ストーリー</div>
+        </button>
+      </nav>
     </footer>
   </div>
 

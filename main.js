@@ -1,7 +1,7 @@
 const screen = document.getElementById("screen");
-const stepLabel = document.getElementById("stepLabel");
 const backBtn = document.getElementById("backBtn");
 const nextBtn = document.getElementById("nextBtn");
+const homeBtn = document.getElementById("homeBtn");
 const topbarTitle = document.querySelector(".topbar .title");
 const nav = document.querySelector(".nav");
 const navItems = Array.from(document.querySelectorAll(".navItem"));
@@ -26,7 +26,7 @@ const members = [
 ];
 
 // --- 状態 ---
-const state = {
+const defaultState = {
   tab: "home", // home / work / recruit / base / story
   step: 0,
   job: null,
@@ -40,6 +40,9 @@ const state = {
   orgLevel: 1, // ★追加
 };
 
+// 起動時にロード
+let state = { ...defaultState };
+
 // --- 効果音（assets/coin.mp3 を置いたら鳴る） ---
 let coinAudio = null;
 try {
@@ -50,7 +53,6 @@ try {
 // --- ユーティリティ ---
 function setStep(n){
   state.step = n;
-  stepLabel.textContent = `Step ${n}`;
   render();
 }
 
@@ -94,30 +96,30 @@ function renderChoices(items, selectedId, onClickName){
 
 // --- 画面レンダリング ---
 function render(){
-  topbarTitle.textContent = `Prototype  所持金: ${formatYen(state.wallet)}`;
-  stepLabel.textContent = state.tab === "home" ? "Home" : `Work Step ${state.step}`;
+  topbarTitle.textContent = `資金：${state.wallet.toLocaleString("ja-JP")}円`;
 
-  // ナビのactive更新
   navItems.forEach(b => b.classList.toggle("active", b.dataset.tab === state.tab));
 
   clearTimerIfLeavingWait();
 
   if (state.tab === "home") return renderHomeNew();
-  if (state.tab === "recruit") return renderPlaceholder("採用", "準備中！メンバーを増やす機能をここに作る。");
+  if (state.tab === "recruit") return renderPlaceholder("人事", "準備中！メンバーを増やす機能をここに作る。");
   if (state.tab === "base") return renderPlaceholder("拠点", "準備中！組織レベルや強化要素をここに作る。");
   if (state.tab === "story") return renderPlaceholder("ストーリー", "準備中！イベント・会話・分岐をここに追加。");
 
-  // work のときだけ既存のstepフローを描画
   if (state.tab === "work"){
-    if (state.step === 1) renderStep1();
-    if (state.step === 2) renderStep2();
-    if (state.step === 3) renderStep3();
-    if (state.step === 4) renderStep4();
-    if (state.step === 5) renderStep5();
-    if (state.step === 6) renderStep6();
-    else setStep(1); // ★不正stepなら戻す
+    switch (state.step) {
+      case 1: return renderStep1();
+      case 2: return renderStep2();
+      case 3: return renderStep3();
+      case 4: return renderStep4();
+      case 5: return renderStep5();
+      case 6: return renderStep6();
+      default: return setStep(1);
+    }
   }
 }
+
 
 function clearTimerIfLeavingWait(){
   // wait中以外なら止める
@@ -144,24 +146,16 @@ function canGoNext(){
 function renderHomeNew(){
   const body = `
     <div class="homeWrap">
-      <div class="homeTop">
-        <section class="card">
-          <div class="h1"><b>${getOrgStatusText()}</b></div>
-          <p class="p">
-            ノガミが率いる組織の現在地
-          </p>
-          <div class="pill">所持金: <b>${formatYen(state.wallet)}</b></div>
-        </section>
-      </div>
+      <section class="card" style="margin-top:0">
+        <p class="p">組織の現在地</p>
+        <div class="h1"><b>${getOrgStatusText()}</b></div>
+      </section>
+      <div style="flex:1"></div>
 
       <div class="homeBottom">
         <div class="bubble">
           <div class="nameTag">ノガミ</div>
           <div class="bubbleText">${getNogamiLine()}</div>
-        </div>
-
-        <div class="character" aria-label="主人公（仮置き）">
-          <div class="silhouette"></div>
         </div>
       </div>
     </div>
@@ -212,7 +206,11 @@ function renderStep1(){
     ${renderChoices(jobs, state.job?.id, "job")}
     ${state.job ? `<div class="pill">選択中: <b>${state.job.name}</b></div>` : ``}
   `;
-  screen.innerHTML = card("① 案件タイプを選ぶ", body);
+  const footer = state.job ? `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>` : ``;
+  screen.innerHTML = card("① 案件タイプを選ぶ", body) + footer;
+  if (state.job) {
+    document.getElementById("goNext").addEventListener("click", () => setStep(2));
+  }
 }
 
 // Step 2: 演出（簡易マッチ）
@@ -226,7 +224,9 @@ function renderStep2(){
     </div>
     <p class="p">「次へ」でターゲット選択に進みます。</p>
   `;
-  screen.innerHTML = card("② 簡易演出", body);
+  const footer = `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>`;
+  screen.innerHTML = card("② 簡易演出", body) + footer;
+  document.getElementById("goNext").addEventListener("click", () => setStep(3));
 
   // アニメ
   const bar = document.getElementById("bar");
@@ -248,7 +248,11 @@ function renderStep3(){
     ${renderChoices(targets.map(t => ({...t, desc:`Lv.${t.level} / 不安定度 ${t.risk}` })), state.target?.id, "target")}
     ${state.target ? `<div class="pill">選択中: <b>${state.target.name}</b>（Lv.${state.target.level}）</div>` : ``}
   `;
-  screen.innerHTML = card("③ ターゲットを選ぶ", body);
+  const footer = state.target ? `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>` : ``;
+  screen.innerHTML = card("③ ターゲットを選ぶ", body) + footer;
+  if (state.target) {
+    document.getElementById("goNext").addEventListener("click", () => setStep(4));
+  }
 }
 
 // Step 4: メンバー選択
@@ -258,7 +262,11 @@ function renderStep4(){
     ${renderChoices(members.map(m => ({...m, desc:`Lv.${m.level} / 安定係数 ${m.stability}` })), state.member?.id, "member")}
     ${state.member ? `<div class="pill">選択中: <b>${state.member.name}</b>（Lv.${state.member.level}）</div>` : ``}
   `;
-  screen.innerHTML = card("④ メンバーを選ぶ", body);
+  const footer = state.member ? `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>` : ``;
+  screen.innerHTML = card("④ メンバーを選ぶ", body) + footer;
+  if (state.member) {
+    document.getElementById("goNext").addEventListener("click", () => setStep(5));
+  }
 }
 
 // Step 5: 待機（1〜3分）
@@ -330,7 +338,7 @@ function renderStep6(){
     // リセット
     clearTimer();
     state.step = 1;
-    state.jpb = null;
+    state.job = null;
     state.target = null;
     state.member = null;
     state.startedAt = null;
@@ -411,6 +419,12 @@ nav.addEventListener("click", (e) => {
   }
 
   // home / recruit / base / story はそのまま表示（準備中でもOK）
+  render();
+});
+
+// --- ヘッダーホームボタン ---
+homeBtn.addEventListener("click", () => {
+  state.tab = "home";
   render();
 });
 

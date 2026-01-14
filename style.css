@@ -2,7 +2,7 @@
   --bg:#0b0c10;
   --panel:#111319;
   --text:#e8e9ee;
-  --muted:#9aa0/compiler;
+  --muted:#9aa0c5; /* 修正 */
   --line:#242836;
   --accent:#6ee7ff;
   --good:#34d399;
@@ -19,15 +19,26 @@ html, body{
 
 #app{
   width:min(420px, 100vw);
-  height:100vh;
+  min-height:100dvh; /* iOS対策 */
+  height:100dvh;     /* iOS対策 */
   margin:0 auto;
   display:flex;
   flex-direction:column;
 }
 
 .topbar{
-  padding:14px 16px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding:10px 16px;
   border-bottom:1px solid var(--line);
+}
+.iconBtn{
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
 }
 .title{font-weight:700; letter-spacing:.5px;}
 .sub{color:#a9b0c5; font-size:12px; margin-top:4px;}
@@ -68,7 +79,7 @@ html, body{
 .bottombar{
   display:flex;
   gap:10px;
-  padding:12px 16px;
+  padding:0;
   border-top:1px solid var(--line);
   background: rgba(9,10,15,.55);
   backdrop-filter: blur(10px);
@@ -133,15 +144,15 @@ html, body{
 /* 下部ナビ */
 .nav{
   display:flex;
-  gap:8px;
-  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-  border-top:1px solid var(--line);
-  background: rgba(9,10,15,.70);
-  backdrop-filter: blur(10px);
+  gap:4px;
+  padding:10px 4px calc(10px + env(safe-area-inset-bottom));
+  overflow-x:auto;         /* はみ出たら横スクロール */
+  -webkit-overflow-scrolling: touch;
+  width:100%;
 }
 
 .navItem{
-  flex:1;
+  flex:1;                  /* 均等に広げる */
   border:1px solid var(--line);
   background:#0f1320;
   color:#c7ccdd;
@@ -162,7 +173,10 @@ html, body{
 }
 
 .navIcon{font-size:18px; line-height:1;}
-.navLabel{font-size:12px; font-weight:800;}
+.navLabel{
+  white-space:nowrap;      /* 文字を折り返さない */
+  font-size:11px;          /* 12のままでもOK。気になるなら11 */
+}
 
 /* Homeレイアウト */
 .homeWrap{
@@ -170,24 +184,23 @@ html, body{
   display:flex;
   flex-direction:column;
   gap:12px;
+  /* 背景画像の設定 */
+  background: url("assets/first.png") no-repeat center center / cover;
+  margin: -16px;  /* 親要素(screen)のpaddingを打ち消して端まで広げる */
+  padding: 16px;  /* 中身の要素の位置を元に戻す */
 }
 
-.homeTop{
-  flex:1;
-  min-height:220px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.homeTop .card{
+.homeWrap .card{
   width:100%;
+  /* 少し透過させてすりガラス効果をつける */
+  background: linear-gradient(180deg, rgba(18, 22, 37, 0.85), rgba(17, 19, 25, 0.85));
+  backdrop-filter: blur(5px);
 }
 
 /* 下1/3：吹き出し＋立ち絵 */
 .homeBottom{
-  height:33vh;            /* 画面下1/3くらい */
-  min-height:220px;
+  height:16vh;            /* 画面下1/6くらい */
+  min-height:110px;
   display:flex;
   gap:10px;
   align-items:stretch;
@@ -196,7 +209,8 @@ html, body{
 .bubble{
   flex:1;
   position:relative;
-  background: linear-gradient(180deg, #121625, var(--panel));
+  background: linear-gradient(180deg, rgba(18, 22, 37, 0.85), rgba(17, 19, 25, 0.85));
+  backdrop-filter: blur(5px);
   border:1px solid var(--line);
   border-radius:18px;
   padding:16px 14px 14px;
@@ -211,7 +225,7 @@ html, body{
   bottom:28px;
   width:18px;
   height:18px;
-  background: linear-gradient(180deg, #121625, var(--panel));
+  background: linear-gradient(180deg, rgba(18, 22, 37, 0.85), rgba(17, 19, 25, 0.85));
   border-right:1px solid var(--line);
   border-bottom:1px solid var(--line);
   transform: rotate(-45deg);
@@ -240,32 +254,9 @@ html, body{
   white-space:pre-line;
 }
 
-/* 右側：主人公（仮） */
-.character{
-  width:34%;
-  min-width:120px;
-  border:1px solid var(--line);
-  border-radius:18px;
-  background: radial-gradient(400px 300px at 40% 30%, #2a355a, #0c1020);
-  display:flex;
-  align-items:flex-end;
-  justify-content:center;
-  position:relative;
-  overflow:hidden;
-}
-
-.character .silhouette{
-  width:90%;
-  height:92%;
-  border-radius:16px;
-  background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
-  filter: blur(.2px);
-  transform: translateY(8px);
-}
-
 /* スマホで下部が窮屈なら高さを少し下げる */
 @media (max-height: 700px){
-  .homeBottom{ height: 38vh; }
+  .homeBottom{ height: 19vh; }
 }
 
 .choice {
