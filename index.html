@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Vertical MVP Prototype</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="title">Prototype</div>
+      <div class="sub" id="stepLabel">Step 1</div>
+    </header>
+
+    <main id="screen" class="screen"></main>
+
+    <footer class="bottombar">
+      <footer class="nav">
+    <button class="navItem active" data-tab="home">
+        <div class="navIcon">🏠</div>
+        <div class="navLabel">ホーム</div>
+    </button>
+    <button class="navItem" data-tab="recruit">
+        <div class="navIcon">👥</div>
+        <div class="navLabel">採用</div>
+    </button>
+
+    <button class="navItem" data-tab="base">
+        <div class="navIcon">🏠</div>
+        <div class="navLabel">拠点</div>
+    </button>
+
+    <button class="navItem active" data-tab="work">
+        <div class="navIcon">💼</div>
+        <div class="navLabel">仕事</div>
+    </button>
+
+    <button class="navItem" data-tab="story">
+        <div class="navIcon">📖</div>
+        <div class="navLabel">ストーリー</div>
+    </button>
+    </footer>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
