@@ -375,24 +375,10 @@ function resolveResult(){
 }
 
 // --- クリック処理（イベントデリゲーション） ---
-screen.addEventListener("click", (e)=>{
-  if (homeEl) {
-    const key = homeEl.dataset.home;
-
-    if (key === "work") {
-      // 仕事へ：案件選択（Step1）へ
-      setStep(1);
-      return;
-    }
-
-    // 採用/拠点は今はダミー（後で実装）
-    alert("準備中！まずは「仕事」で稼ごう");
-    return;
-  }
-
-  // ↓ここから下は既存の choice（job/target/member）処理
+screen.addEventListener("pointerup", (e)=> {
   const el = e.target.closest(".choice");
   if (!el) return;
+
   const id = el.dataset.id;
   const on = el.dataset.on;
 

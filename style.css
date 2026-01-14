@@ -267,3 +267,7 @@ html, body{
 @media (max-height: 700px){
   .homeBottom{ height: 38vh; }
 }
+
+.choice {
+  touch-action: manipulation;
+}
