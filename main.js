@@ -11,6 +11,7 @@ const jobs = [
   { id: "empathy", name: "関係構築型", desc: "信頼を積むタイプ。リスクも積み上がる。", base: 1200 },
   { id: "urgency", name: "緊急誘導型", desc: "短期決着。成功しても不安定。", base: 900 },
   { id: "opportunity", name: "機会提示型", desc: "条件が噛み合うと伸びる。", base: 1000 },
+  { id: "oreore", name: "オレオレ詐欺", desc: "タキが好む手法。オレオレと言いたいだけではないのか。", base: 1100 },
 ];
 
 const targets = [
@@ -25,6 +26,24 @@ const members = [
   { id: "m3", name: "メンバー③", level: 3, stability: 0.9 },
 ];
 
+const oreoreMembers = [
+  { id: "taki", name: "タキ", desc: "直情的な元リーダー" },
+  { id: "akou", name: "アコウ", desc: "落ち着きがあるサブリーダー" },
+  { id: "mob", name: "モブ", desc: "ただの下っ端" },
+];
+
+const oreoreTargets = [
+  { id: "oldman", name: "モブじい", desc: "警戒心が薄い", assets: 2, vigilance: 1 },
+  { id: "oldwoman", name: "モブばあ", desc: "話好き", assets: 5, vigilance: 3 },
+  { id: "mob3", name: "モブさん", desc: "一般的", assets: 10, vigilance: 5 },
+];
+
+const oreoreTactics = [
+  { id: "manual", name: "手順書通りに進めていけ", desc: "基本に忠実なアプローチ" },
+  { id: "flexible", name: "柔軟に対応しろ", desc: "状況に応じたアドリブ" },
+  { id: "push", name: "勢いで押し切れ", desc: "強引な突破" },
+];
+
 // --- 状態 ---
 const defaultState = {
   tab: "home", // home / work / recruit / base / story
@@ -32,12 +51,17 @@ const defaultState = {
   job: null,
   target: null,
   member: null,
+  headMember: null,
+  tactic: null,
   waitSec: 0,
   timer: null,
   startedAt: null,
   earned: 0,
   wallet: 0, // 所持金（累計）
   orgLevel: 1, // ★追加
+  storyOpen: null, // "main" or "sub"
+  storyPlaying: null, // 再生中のストーリーID
+  storyIndex: 0,      // 現在の台詞インデックス
 };
 
 // 起動時にロード
@@ -83,15 +107,17 @@ function card(title, bodyHtml){
   `;
 }
 
-function renderChoices(items, selectedId, onClickName){
-  const html = items.map(it => `
+function renderChoices(items, selectedId, onClickName, containerClass = "row"){
+  const html = items.map(it => {
+    const meta = it.desc ?? (it.level !== undefined ? `Lv.${it.level}` : "");
+    return `
     <div class="choice ${selectedId===it.id ? "selected":""}" data-id="${it.id}" data-on="${onClickName}">
       <div class="name">${it.name}</div>
-      <div class="meta">${it.desc ?? `Lv.${it.level}`}</div>
+      ${meta ? `<div class="meta">${meta}</div>` : ""}
       ${it.level ? `<div class="meta">レベル: <b style="color:#e8e9ee">Lv.${it.level}</b></div>` : ``}
     </div>
-  `).join("");
-  return `<div class="row">${html}</div>`;
+  `}).join("");
+  return `<div class="${containerClass}">${html}</div>`;
 }
 
 // --- 画面レンダリング ---
@@ -102,12 +128,28 @@ function render(){
 
   clearTimerIfLeavingWait();
 
+  // ストーリー再生中なら最優先でプレイヤーを表示
+  if (state.storyPlaying) return renderStoryPlayer();
+
   if (state.tab === "home") return renderHomeNew();
   if (state.tab === "recruit") return renderPlaceholder("人事", "準備中！メンバーを増やす機能をここに作る。");
   if (state.tab === "base") return renderPlaceholder("拠点", "準備中！組織レベルや強化要素をここに作る。");
-  if (state.tab === "story") return renderPlaceholder("ストーリー", "準備中！イベント・会話・分岐をここに追加。");
+  if (state.tab === "story") return renderStory();
 
   if (state.tab === "work"){
+    // オレオレ詐欺ルート
+    if (state.job?.id === "oreore") {
+      switch (state.step) {
+        case 1: return renderStep1();
+        case 2: return renderOreoreStep2();
+        case 3: return renderOreoreStep3();
+        case 4: return renderOreoreStep4();
+        case 5: return renderOreoreStep5();
+        case 6: return renderOreoreStep6();
+        default: return renderPlaceholder("オレオレ詐欺", "ここから先は実装待ちです。");
+      }
+    }
+
     switch (state.step) {
       case 1: return renderStep1();
       case 2: return renderStep2();
@@ -139,7 +181,7 @@ function canGoNext(){
   if (state.step === 3) return !!state.target;
   if (state.step === 4) return !!state.member;
   if (state.step === 5) return false; // 待機中は自動遷移
-  if (state.step === 6) return false;
+  if (state.step === 6) return false; // 結果画面
   return false;
 }
 
@@ -199,18 +241,173 @@ function renderPlaceholder(title, text){
   screen.innerHTML = card(title, `<p class="p">${text}</p>`);
 }
 
+// ストーリー画面
+function renderStory() {
+  const isOpenMain = state.storyOpen === "main";
+  const isOpenSub = state.storyOpen === "sub";
+
+  const body = `
+    <div class="storyHeader" data-cat="main">
+      <div>メインストーリー</div>
+      <div style="font-size:12px; color:#9aa0c5">${isOpenMain ? "▲" : "▼"}</div>
+    </div>
+    ${isOpenMain ? `<div style="margin-top:10px">${renderChoices(stories.main, null, "readMain", "list")}</div>` : ""}
+    
+    <div style="height:10px"></div>
+
+    <div class="storyHeader" data-cat="sub">
+      <div>サブストーリー</div>
+      <div style="font-size:12px; color:#9aa0c5">${isOpenSub ? "▲" : "▼"}</div>
+    </div>
+    ${isOpenSub ? `<div style="margin-top:10px">${renderChoices(stories.sub, null, "readSub", "list")}</div>` : ""}
+  `;
+
+  screen.innerHTML = card("ストーリー", body);
+}
+
+// ストーリー再生（ノベルパート）
+function renderStoryPlayer(){
+  const script = storyScripts[state.storyPlaying];
+  
+  // 終了判定（最後まで読んだら一覧に戻る）
+  if (!script || state.storyIndex >= script.length) {
+    state.storyPlaying = null;
+    state.storyIndex = 0;
+    render();
+    return;
+  }
+
+  const line = script[state.storyIndex];
+  
+  const body = `
+    <div class="storyView">
+      <div class="storyBubble">
+        ${line.speaker ? `<div class="storyName">${line.speaker}</div>` : ""}
+        <div class="storyText">${line.text}</div>
+        <div style="text-align:right; font-size:12px; color:#666; margin-top:8px;">▼</div>
+      </div>
+    </div>
+  `;
+  screen.innerHTML = body;
+}
+
 // Step 1: 案件選択
 function renderStep1(){
   const body = `
-    <p class="p">ゲーム内の“案件タイプ”を選択します（抽象カテゴリ）。</p>
-    ${renderChoices(jobs, state.job?.id, "job")}
+    ${renderChoices(jobs, state.job?.id, "job", "list")}
     ${state.job ? `<div class="pill">選択中: <b>${state.job.name}</b></div>` : ``}
   `;
   const footer = state.job ? `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>` : ``;
-  screen.innerHTML = card("① 案件タイプを選ぶ", body) + footer;
+  screen.innerHTML = card("どの犯罪を行う？", body) + footer;
   if (state.job) {
     document.getElementById("goNext").addEventListener("click", () => setStep(2));
   }
+}
+
+// Step 2 (Oreore): ヘッドメンバー選択
+function renderOreoreStep2(){
+  const body = `
+    ${renderChoices(oreoreMembers, state.headMember?.id, "headMember", "list")}
+    ${state.headMember ? `<div class="pill">選択中: <b>${state.headMember.name}</b></div>` : ``}
+  `;
+  const footer = state.headMember ? `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>` : ``;
+  screen.innerHTML = card("ヘッドメンバー選択", body) + footer;
+  if (state.headMember) {
+    document.getElementById("goNext").addEventListener("click", () => setStep(3));
+  }
+}
+
+// Step 3 (Oreore): ターゲット選択
+function renderOreoreStep3(){
+  // 表示用に情報を付加して表示
+  const items = oreoreTargets.map(t => ({
+    ...t,
+    desc: `${t.desc} / 資産Lv${t.assets} 警戒Lv${t.vigilance}`
+  }));
+  const body = `
+    ${renderChoices(items, state.target?.id, "oreoreTarget", "list")}
+    ${state.target ? `<div class="pill">選択中: <b>${state.target.name}</b></div>` : ``}
+  `;
+  const footer = state.target ? `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>` : ``;
+  screen.innerHTML = card("ターゲット選択", body) + footer;
+  if (state.target) {
+    document.getElementById("goNext").addEventListener("click", () => setStep(4));
+  }
+}
+
+// Step 4 (Oreore): ヘッドメンバーとの会話（指示選択）
+function renderOreoreStep4(){
+  const body = `
+    <p class="p">ヘッドメンバー（${state.headMember?.name}）に指示を出します。</p>
+    ${renderChoices(oreoreTactics, state.tactic?.id, "tactic", "list")}
+    ${state.tactic ? `<div class="pill">選択中: <b>${state.tactic.name}</b></div>` : ``}
+  `;
+  const footer = state.tactic ? `<div class="row" style="margin-top:16px"><button class="btn" id="goNext">次へ</button></div>` : ``;
+  screen.innerHTML = card("ヘッドメンバーとの会話", body) + footer;
+  if (state.tactic) {
+    document.getElementById("goNext").addEventListener("click", () => setStep(5));
+  }
+}
+
+// Step 5 (Oreore): 待機
+function renderOreoreStep5(){
+  if (!state.startedAt) {
+    state.waitSec = 3; // 3秒固定
+    state.startedAt = Date.now();
+  }
+
+  const body = `
+    <p class="p">実行中…</p>
+    <div class="card" style="border-style:dashed">
+      <div class="big" id="remain">--:--</div>
+      <div class="kicker">結果を待っています</div>
+      <div class="progressWrap"><div class="progressBar" id="pbar"></div></div>
+    </div>
+  `;
+  // フッター領域（最初は空、完了後にボタン表示）
+  const footer = `<div class="row" style="margin-top:16px" id="oreoreWaitFooter"></div>`;
+  
+  screen.innerHTML = card("待機", body) + footer;
+
+  const remainEl = document.getElementById("remain");
+  const pbar = document.getElementById("pbar");
+  const footerEl = document.getElementById("oreoreWaitFooter");
+
+  clearTimer();
+  state.timer = setInterval(()=>{
+    const elapsed = Math.floor((Date.now() - state.startedAt) / 1000);
+    const left = Math.max(0, state.waitSec - elapsed);
+
+    const mm = String(Math.floor(left / 60)).padStart(2,"0");
+    const ss = String(left % 60).padStart(2,"0");
+    remainEl.textContent = `${mm}:${ss}`;
+
+    const prog = Math.min(100, (elapsed / state.waitSec) * 100);
+    pbar.style.width = prog + "%";
+
+    if (left <= 0) {
+      clearTimer();
+      // 自動遷移
+      resolveOreoreResult();
+      setStep(6);
+    }
+  }, 200);
+}
+
+// Step 6 (Oreore): 結果表示
+function renderOreoreStep6(){
+  const body = `
+    <p class="p">今回の成果です。</p>
+    <div class="card" style="text-align:center">
+      <div class="big">${formatYen(state.earned)}</div>
+      <div class="kicker">チャリーン</div>
+    </div>
+    <div class="row">
+      <button class="btn" id="retryBtn">もう一回</button>
+    </div>
+  `;
+  screen.innerHTML = card("結果表示", body);
+  document.getElementById("retryBtn").addEventListener("click", resetWorkState);
 }
 
 // Step 2: 演出（簡易マッチ）
@@ -334,17 +531,7 @@ function renderStep6(){
   screen.innerHTML = card("⑥ 結果", body);
 
   const retryBtn = document.getElementById("retryBtn");
-  retryBtn.addEventListener("click", ()=>{
-    // リセット
-    clearTimer();
-    state.step = 1;
-    state.job = null;
-    state.target = null;
-    state.member = null;
-    state.startedAt = null;
-    state.waitSec = 0;
-    render();
-  }, { once:true });
+  retryBtn.addEventListener("click", resetWorkState, { once:true });
 }
 
 // --- 結果計算（ゲーム用の簡易式）---
@@ -382,8 +569,65 @@ function resolveResult(){
   playCoin();
 }
 
+// --- オレオレ詐欺の結果計算 ---
+function resolveOreoreResult(){
+  const t = state.target;
+  if (!t) return;
+
+  // 成功率: 基本100% - (警戒Lv * 10%)
+  // 例: 警戒Lv1 -> 90%, Lv5 -> 50%
+  const successRate = Math.max(0, 1.0 - (t.vigilance * 0.1));
+  const isSuccess = Math.random() < successRate;
+  
+  if (isSuccess) {
+    // 成功報酬: 資産Lv * 10万円 * ランダム(0.8~1.2)
+    const base = t.assets * 100000;
+    const variance = 0.8 + Math.random() * 0.4;
+    state.earned = Math.floor(base * variance);
+  } else {
+    // 失敗
+    state.earned = 0;
+  }
+
+  state.wallet += state.earned;
+  playCoin();
+}
+
+// --- ワーク状態のリセット ---
+function resetWorkState(){
+  clearTimer();
+  state.step = 1;
+  state.job = null;
+  state.target = null;
+  state.member = null;
+  state.headMember = null;
+  state.tactic = null;
+  state.startedAt = null;
+  state.waitSec = 0;
+  state.earned = 0;
+  render();
+}
+
+
 // --- クリック処理（イベントデリゲーション） ---
 screen.addEventListener("pointerup", (e)=> {
+  // ストーリー再生中のタップ（次へ進む）
+  if (state.storyPlaying) {
+    state.storyIndex++;
+    render();
+    return;
+  }
+
+  // ストーリーヘッダー判定
+  const header = e.target.closest(".storyHeader");
+  if (header) {
+    const cat = header.dataset.cat;
+    if (state.storyOpen === cat) state.storyOpen = null; // 閉じる
+    else state.storyOpen = cat; // 開く
+    render();
+    return;
+  }
+
   const el = e.target.closest(".choice");
   if (!el) return;
 
@@ -393,6 +637,19 @@ screen.addEventListener("pointerup", (e)=> {
   if (on === "job") state.job = jobs.find(x => x.id === id);
   if (on === "target") state.target = targets.find(x => x.id === id);
   if (on === "member") state.member = members.find(x => x.id === id);
+  if (on === "headMember") state.headMember = oreoreMembers.find(x => x.id === id);
+  if (on === "oreoreTarget") state.target = oreoreTargets.find(x => x.id === id);
+  if (on === "tactic") state.tactic = oreoreTactics.find(x => x.id === id);
+  
+  if (on === "readMain") {
+    if (storyScripts[id]) {
+      state.storyPlaying = id;
+      state.storyIndex = 0;
+      render();
+    } else {
+      alert("このストーリーはまだ実装されていません。");
+    }
+  }
 
   render();
 });
@@ -409,13 +666,7 @@ nav.addEventListener("click", (e) => {
 
   if (tab === "work") {
     // 仕事に入ったら案件選択から（毎回リセット）
-    state.step = 1;
-    state.job = null;
-    state.target = null;
-    state.member = null;
-    state.startedAt = null;
-    state.waitSec = 0;
-    state.earned = 0;
+    resetWorkState();
   }
 
   // home / recruit / base / story はそのまま表示（準備中でもOK）
