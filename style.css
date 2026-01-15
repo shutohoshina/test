@@ -41,7 +41,12 @@ html, body{
   cursor: pointer;
   padding: 0;
 }
-.title{font-weight:700; letter-spacing:.5px;}
+.title{
+  font-weight:700;
+  letter-spacing:.5px;
+  font-size: 18px;
+  margin: 0;
+}
 .sub{color:#a9b0c5; font-size:12px; margin-top:4px;}
 
 .screen{

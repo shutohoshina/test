@@ -44,6 +44,19 @@ const oreoreTactics = [
   { id: "push", name: "勢いで押し切れ", desc: "強引な突破" },
 ];
 
+const personnel = [
+  { id: "nogami", name: "ノガミ", role: "リーダー", age: "20代後半", text: "主人公。四大卒。アコウの紹介でグループに参加した。" },
+  { id: "taki", name: "タキ", role: "元リーダー", age: "30代前半", text: "元リーダー。四大卒。アコウと共にグループを創設した。感情的になりやすく、よくアジトを飛び出す。" },
+  { id: "akou", name: "アコウ", role: "サブリーダー", age: "30代前半", text: "サブリーダー。博士課程満期退学。タキと共にグループを創設した。タキとは意見が合わないことが多い。" },
+];
+
+const baseLevels = [
+  { level: 1, name: "ボロアジト", cost: 0, cap: 10, desc: "誰もいない家に住み着いた。住居侵入罪だ。" },
+  { level: 2, name: "ちょいボロアジト", cost: 1000000, cap: 20, desc: "雨風はしのげる。少しマシになった。", unlock: "新案件: 緊急誘導型" },
+  { level: 3, name: "雑居ビル", cost: 5000000, cap: 30, desc: "怪しいテナントだが、広さは十分。", unlock: "新案件: 機会提示型" },
+  { level: 4, name: "高級オフィス", cost: 20000000, cap: 50, desc: "表向きはIT企業。誰も犯罪組織とは思うまい。", unlock: "メンバー枠拡大" },
+];
+
 // --- 状態 ---
 const defaultState = {
   tab: "home", // home / work / recruit / base / story
@@ -62,6 +75,8 @@ const defaultState = {
   storyOpen: null, // "main" or "sub"
   storyPlaying: null, // 再生中のストーリーID
   storyIndex: 0,      // 現在の台詞インデックス
+  recruitOpen: false, // 人事リストの開閉
+  viewingMember: null, // 詳細表示中のメンバーID
 };
 
 // 起動時にロード
@@ -128,13 +143,13 @@ function render(){
 
   clearTimerIfLeavingWait();
 
-  // ストーリー再生中なら最優先でプレイヤーを表示
-  if (state.storyPlaying) return renderStoryPlayer();
-
   if (state.tab === "home") return renderHomeNew();
-  if (state.tab === "recruit") return renderPlaceholder("人事", "準備中！メンバーを増やす機能をここに作る。");
-  if (state.tab === "base") return renderPlaceholder("拠点", "準備中！組織レベルや強化要素をここに作る。");
-  if (state.tab === "story") return renderStory();
+  if (state.tab === "recruit") return renderRecruit();
+  if (state.tab === "base") return renderBase();
+  if (state.tab === "story") {
+    if (state.storyPlaying) return renderStoryPlayer();
+    return renderStory();
+  }
 
   if (state.tab === "work"){
     // オレオレ詐欺ルート
@@ -241,6 +256,115 @@ function renderPlaceholder(title, text){
   screen.innerHTML = card(title, `<p class="p">${text}</p>`);
 }
 
+// 人事画面
+function renderRecruit() {
+  // 詳細表示中ならそちらを表示
+  if (state.viewingMember) {
+    return renderMemberDetail();
+  }
+
+  const isOpen = state.recruitOpen;
+  
+  const body = `
+    <div class="storyHeader" id="recruitListHeader">
+      <div>メンバーリスト</div>
+      <div style="font-size:12px; color:#9aa0c5">${isOpen ? "▲" : "▼"}</div>
+    </div>
+    ${isOpen ? `<div style="margin-top:10px">${renderChoices(personnel, null, "viewMember", "list")}</div>` : ""}
+  `;
+  
+  screen.innerHTML = card("人事", body);
+}
+
+// メンバー詳細画面
+function renderMemberDetail() {
+  const m = personnel.find(x => x.id === state.viewingMember);
+  if (!m) {
+    state.viewingMember = null;
+    render();
+    return;
+  }
+
+  const body = `
+    <div style="margin-bottom:16px">
+      <button class="btn" id="backToRecruit" style="padding:6px 12px; font-size:12px">← リストに戻る</button>
+    </div>
+    <div class="card" style="background:#0f1320; border:none;">
+      <div class="h1">${m.name}</div>
+      <div class="pill" style="margin-top:0">${m.role}</div>
+      <div class="p" style="margin-top:12px; color:#e8e9ee;">${m.text}</div>
+      <div class="row" style="margin-top:20px; border-top:1px solid #242836; padding-top:10px;">
+        <div class="p">年齢: ${m.age}</div>
+      </div>
+    </div>
+  `;
+  screen.innerHTML = card("メンバー詳細", body);
+  
+  document.getElementById("backToRecruit").addEventListener("click", () => {
+    state.viewingMember = null;
+    render();
+  });
+}
+
+// 拠点画面
+function renderBase(){
+  const current = baseLevels.find(l => l.level === state.orgLevel) || baseLevels[0];
+  const next = baseLevels.find(l => l.level === state.orgLevel + 1);
+
+  const body = `
+    <div style="display:flex; gap:16px; align-items:center; margin-bottom:20px;">
+      <div style="font-size:42px;">🏠</div>
+      <div>
+        <div class="h1" style="margin:0 0 4px; font-size:16px;">Lv.${current.level} ${current.name}</div>
+        <div class="p" style="line-height:1.4;">${current.desc}</div>
+        <div class="pill" style="margin-top:6px; padding:4px 8px; font-size:11px;">メンバーLv上限: <b>${current.cap}</b></div>
+      </div>
+    </div>
+
+    ${next ? `
+      <div style="border-top:1px solid var(--line); padding-top:16px;">
+        <div class="h1" style="font-size:15px; margin-bottom:10px;">拠点強化</div>
+        
+        <div class="list" style="margin-top:0; background:#0f1320; padding:10px; border-radius:8px;">
+          <div class="row" style="justify-content:space-between; align-items:center; margin-top:0;">
+            <div style="font-weight:bold; font-size:13px;">次: ${next.name}</div>
+            <div style="color:var(--accent); font-size:12px;">Lv.${next.level}</div>
+          </div>
+          <div class="p" style="margin-top:6px; font-size:12px;">✨ 上限解放: ${current.cap} → <b>${next.cap}</b></div>
+          ${next.unlock ? `<div class="p" style="font-size:12px;">🔓 解放: <b>${next.unlock}</b></div>` : ""}
+        </div>
+
+        <div style="margin-top:14px;">
+          <button class="btn" id="levelUpBtn" ${state.wallet < next.cost ? "disabled" : ""}>
+            強化する (${formatYen(next.cost)})
+          </button>
+          ${state.wallet < next.cost ? `<div class="p" style="text-align:center; margin-top:4px; color:#fb7185; font-size:11px;">資金が足りません</div>` : ""}
+        </div>
+      </div>
+    ` : `
+      <div style="border-top:1px solid var(--line); padding-top:16px; text-align:center;">
+        <div class="p">これ以上の強化はできません（カンスト）</div>
+      </div>
+    `}
+  `;
+  screen.innerHTML = card("拠点", body);
+
+  if(next){
+    const btn = document.getElementById("levelUpBtn");
+    if(btn){
+      btn.addEventListener("click", () => {
+        if(state.wallet >= next.cost){
+          state.wallet -= next.cost;
+          state.orgLevel++;
+          playCoin(); // 音を鳴らす
+          alert(`拠点が「${next.name}」になりました！`);
+          render();
+        }
+      });
+    }
+  }
+}
+
 // ストーリー画面
 function renderStory() {
   const isOpenMain = state.storyOpen === "main";
@@ -281,6 +405,9 @@ function renderStoryPlayer(){
   
   const body = `
     <div class="storyView">
+      <div style="margin-bottom:auto">
+        <button class="btn" id="quitStoryBtn" style="padding:6px 12px; font-size:12px">← ストーリーに戻る</button>
+      </div>
       <div class="storyBubble">
         ${line.speaker ? `<div class="storyName">${line.speaker}</div>` : ""}
         <div class="storyText">${line.text}</div>
@@ -613,7 +740,22 @@ function resetWorkState(){
 screen.addEventListener("pointerup", (e)=> {
   // ストーリー再生中のタップ（次へ進む）
   if (state.storyPlaying) {
+    // 戻るボタンが押された場合
+    if (e.target.closest("#quitStoryBtn")) {
+      state.storyPlaying = null;
+      state.storyIndex = 0;
+      render();
+      return;
+    }
+
     state.storyIndex++;
+    render();
+    return;
+  }
+
+  // 人事リストヘッダー判定
+  if (e.target.closest("#recruitListHeader")) {
+    state.recruitOpen = !state.recruitOpen;
     render();
     return;
   }
@@ -640,6 +782,11 @@ screen.addEventListener("pointerup", (e)=> {
   if (on === "headMember") state.headMember = oreoreMembers.find(x => x.id === id);
   if (on === "oreoreTarget") state.target = oreoreTargets.find(x => x.id === id);
   if (on === "tactic") state.tactic = oreoreTactics.find(x => x.id === id);
+  
+  if (on === "viewMember") {
+    state.viewingMember = id;
+    render();
+  }
   
   if (on === "readMain") {
     if (storyScripts[id]) {
