@@ -4,6 +4,10 @@ const joystickBase = document.getElementById("joystickBase");
 const joystickKnob = document.getElementById("joystickKnob");
 const scoreVal = document.getElementById("scoreVal");
 const gameOverScreen = document.getElementById("gameOver");
+const skillBtn = document.getElementById("skillBtn");
+const skillNameEl = document.getElementById("skillName");
+const skillCoolEl = document.getElementById("skillCool");
+const changeCharBtn = document.getElementById("changeCharBtn");
 
 // ゲーム状態
 let state = {
@@ -15,7 +19,58 @@ let state = {
   score: 0,
   isGameOver: false,
   targets: [],
-  enemies: []
+  enemies: [],
+  bullets: [], // スキル弾など
+  
+  // キャラクター管理
+  charId: "nogami",
+  skillCoolTimer: 0, // 0なら使用可能
+  maxSkillCool: 0
+};
+
+// キャラクター定義
+const CHARACTERS = {
+  nogami: {
+    name: "ノガミ",
+    icon: "😎",
+    color: "#3b82f6",
+    speed: 5,
+    skillName: "オレオレ詐欺",
+    skillCool: 180, // フレーム数 (約3秒)
+    // スキル: 前方に「オレオレ！」弾を発射
+    skillFunc: (s) => {
+      spawnBullet(s.x, s.y, s.vx || 5, s.vy || 0, "オレオレ！", 8, 200);
+    }
+  },
+  taki: {
+    name: "タキ",
+    icon: "😡",
+    color: "#ef4444",
+    speed: 4, // 遅い
+    skillName: "恫喝",
+    skillCool: 300, // 約5秒
+    // スキル: 周囲の敵を吹き飛ばす
+    skillFunc: (s) => {
+      spawnShockwave(s.x, s.y, 150);
+    }
+  },
+  akou: {
+    name: "アコウ",
+    icon: "🤓",
+    color: "#10b981",
+    speed: 6, // 速い
+    skillName: "還付金詐欺",
+    skillCool: 120, // 約2秒
+    // スキル: 近くのターゲットに自動誘導弾
+    skillFunc: (s) => {
+      const target = findNearestTarget(s.x, s.y);
+      if(target) {
+        spawnHomingBullet(s.x, s.y, target, "還付金あります");
+      } else {
+        spawnBullet(s.x, s.y, 0, -5, "還付金…", 5, 100);
+      }
+    }
+  }
 };
 
 // 入力状態
@@ -31,6 +86,7 @@ let input = {
 function init() {
   spawnTarget(); // 最初のターゲット
   spawnEnemy();  // 最初の敵
+  setCharacter("nogami");
   loop();
 }
 
@@ -65,9 +121,33 @@ function spawnEnemy() {
   state.enemies.push({ el, x, y, speed: 1.5 + Math.random() });
 }
 
+// キャラ変更
+function setCharacter(id) {
+  state.charId = id;
+  const char = CHARACTERS[id];
+  player.textContent = char.icon;
+  player.style.background = char.color;
+  state.speed = char.speed;
+  state.maxSkillCool = char.skillCool;
+  state.skillCoolTimer = 0;
+  skillNameEl.textContent = char.skillName;
+  updateSkillUI();
+}
+
+changeCharBtn.addEventListener("click", (e) => {
+  e.stopPropagation(); // ジョイスティック反応防止
+  const ids = Object.keys(CHARACTERS);
+  const nextIdx = (ids.indexOf(state.charId) + 1) % ids.length;
+  setCharacter(ids[nextIdx]);
+});
+
 // --- 入力イベント（ぷにコン風操作） ---
 gameArea.addEventListener("pointerdown", e => {
   if(state.isGameOver) return;
+  
+  // スキルボタンやUI上のタップなら移動しない
+  if (e.target.closest("button")) return;
+
   input.active = true;
   input.startX = e.clientX;
   input.startY = e.clientY;
@@ -117,6 +197,17 @@ gameArea.addEventListener("pointerup", () => {
   joystickBase.style.display = "none";
 });
 
+// スキル発動
+skillBtn.addEventListener("pointerdown", (e) => {
+  e.stopPropagation();
+  if (state.skillCoolTimer > 0) return;
+  
+  const char = CHARACTERS[state.charId];
+  char.skillFunc(state);
+  state.skillCoolTimer = state.maxSkillCool;
+  updateSkillUI();
+});
+
 // --- ゲームループ ---
 function loop() {
   if (state.isGameOver) return;
@@ -131,7 +222,7 @@ function loop() {
   player.style.top = state.y + "px";
   
   // 2. ターゲット処理（接触でHPを削る）
-  state.targets.forEach((t, i) => {
+  state.targets.forEach(t => {
     const dx = state.x - t.x;
     const dy = state.y - t.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
@@ -139,26 +230,14 @@ function loop() {
     // 接触判定（距離50px以内）
     if (dist < 60) {
       t.hp -= 2; // 接触中はHPが減る
-      // 振動演出
-      const shake = Math.random() * 4 - 2;
-      t.el.style.transform = `translate(calc(-50% + ${shake}px), -50%) scale(${0.5 + t.hp/200})`;
-      
-      if (t.hp <= 0) {
-        // 説得完了（撃破）
-        t.el.remove();
-        state.targets.splice(i, 1);
-        state.score += 100000; // 10万円
-        scoreVal.textContent = state.score.toLocaleString();
-        
-        // 次のターゲット出現
-        spawnTarget();
-        // スコアに応じて敵が増える
-        if(state.score % 300000 === 0) spawnEnemy();
-      }
+      updateTargetView(t);
     } else {
       t.el.style.transform = `translate(-50%, -50%) scale(1)`;
     }
   });
+
+  // ターゲットの死亡判定を一括処理
+  checkTargetsDead();
   
   // 3. 敵処理（プレイヤーを追尾）
   state.enemies.forEach(e => {
@@ -180,7 +259,168 @@ function loop() {
     }
   });
   
+  // 4. 弾（スキル）処理
+  state.bullets.forEach(b => {
+    if (!b.active) return;
+    
+    // 移動
+    if (b.homing) {
+      // 誘導弾
+      const dx = b.target.x - b.x;
+      const dy = b.target.y - b.y;
+      const angle = Math.atan2(dy, dx);
+      b.vx = Math.cos(angle) * b.speed;
+      b.vy = Math.sin(angle) * b.speed;
+    }
+    
+    b.x += b.vx;
+    b.y += b.vy;
+    b.life--;
+    
+    b.el.style.left = b.x + "px";
+    b.el.style.top = b.y + "px";
+    
+    // ターゲットとの当たり判定
+    state.targets.forEach(t => {
+      const dx = b.x - t.x;
+      const dy = b.y - t.y;
+      if (Math.sqrt(dx*dx + dy*dy) < 50) {
+        t.hp -= 30; // 大ダメージ
+        updateTargetView(t);
+        b.life = 0; // 弾消滅
+      }
+    });
+    
+    // 寿命尽きたら消す
+    if (b.life <= 0) {
+      b.active = false;
+      b.el.remove();
+    }
+  });
+  state.bullets = state.bullets.filter(b => b.active);
+
+  // 5. クールタイム処理
+  if (state.skillCoolTimer > 0) {
+    state.skillCoolTimer--;
+    updateSkillUI();
+  }
+
   requestAnimationFrame(loop);
+}
+
+// ターゲットの見た目更新＆死亡チェック
+function updateTargetView(t) {
+  const shake = Math.random() * 4 - 2;
+  t.el.style.transform = `translate(calc(-50% + ${shake}px), -50%) scale(${0.5 + t.hp/200})`;
+}
+
+function checkTargetsDead() {
+  for (let i = state.targets.length - 1; i >= 0; i--) {
+    const t = state.targets[i];
+    if (t.hp <= 0) {
+      t.el.remove();
+      state.targets.splice(i, 1);
+      state.score += 100000;
+      scoreVal.textContent = state.score.toLocaleString();
+      spawnTarget();
+      if(state.score % 300000 === 0) spawnEnemy();
+    }
+  }
+}
+
+// スキルUI更新
+function updateSkillUI() {
+  const pct = (state.skillCoolTimer / state.maxSkillCool) * 100;
+  skillCoolEl.style.height = pct + "%";
+  skillBtn.disabled = state.skillCoolTimer > 0;
+}
+
+// --- スキル用ヘルパー ---
+
+// 通常弾発射
+function spawnBullet(x, y, vx, vy, text, speed, life) {
+  // 速度ベクトルがない場合は前方に
+  if (vx === 0 && vy === 0) vx = 1;
+  
+  // 正規化してスピードを掛ける
+  const len = Math.sqrt(vx*vx + vy*vy);
+  vx = (vx / len) * speed;
+  vy = (vy / len) * speed;
+
+  const el = document.createElement("div");
+  el.className = "skillEffect";
+  el.textContent = text;
+  gameArea.appendChild(el);
+  
+  state.bullets.push({ el, x, y, vx, vy, life, active: true });
+}
+
+// 誘導弾発射
+function spawnHomingBullet(x, y, target, text) {
+  const el = document.createElement("div");
+  el.className = "skillEffect";
+  el.textContent = text;
+  el.style.color = "#10b981";
+  gameArea.appendChild(el);
+  
+  state.bullets.push({ el, x, y, vx:0, vy:0, life:300, active:true, homing:true, target, speed:7 });
+}
+
+// 衝撃波（範囲攻撃）
+function spawnShockwave(x, y, radius) {
+  const el = document.createElement("div");
+  el.style.position = "absolute";
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+  el.style.width = "10px";
+  el.style.height = "10px";
+  el.style.border = "4px solid #ef4444";
+  el.style.borderRadius = "50%";
+  el.style.transform = "translate(-50%, -50%)";
+  el.style.transition = "all 0.3s ease-out";
+  el.style.zIndex = "20";
+  gameArea.appendChild(el);
+
+  // アニメーション
+  requestAnimationFrame(() => {
+    el.style.width = (radius * 2) + "px";
+    el.style.height = (radius * 2) + "px";
+    el.style.opacity = "0";
+  });
+  setTimeout(() => el.remove(), 300);
+
+  // 範囲内の敵にダメージ
+  state.targets.forEach(t => {
+    const dist = Math.sqrt((t.x - x)**2 + (t.y - y)**2);
+    if (dist < radius) {
+      t.hp -= 50;
+      updateTargetView(t);
+    }
+  });
+  
+  // 警察を吹き飛ばす（簡易）
+  state.enemies.forEach(e => {
+    const dist = Math.sqrt((e.x - x)**2 + (e.y - y)**2);
+    if (dist < radius) {
+      const angle = Math.atan2(e.y - y, e.x - x);
+      e.x += Math.cos(angle) * 100;
+      e.y += Math.sin(angle) * 100;
+    }
+  });
+}
+
+// 一番近いターゲットを探す
+function findNearestTarget(x, y) {
+  let nearest = null;
+  let minDist = Infinity;
+  state.targets.forEach(t => {
+    const dist = Math.sqrt((t.x - x)**2 + (t.y - y)**2);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = t;
+    }
+  });
+  return nearest;
 }
 
 init();

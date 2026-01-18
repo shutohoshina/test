@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Battle Prototype</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #222; color: white; font-family: sans-serif; touch-action: manipulation; }
+  #gameArea { position: relative; width: 100vw; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  
+  /* ヘッダー（敵情報） */
+  #header { padding: 10px; background: #333; z-index: 10; display: flex; align-items: center; gap: 10px; }
+  .enemyIcon { font-size: 40px; }
+  .barWrap { flex: 1; height: 20px; background: #555; border-radius: 10px; overflow: hidden; position: relative; }
+  .bar { height: 100%; transition: width 0.1s; }
+  #persuadeBar { background: #3b82f6; width: 0%; } /* 説得度（青） */
+  #hpBar { background: #ef4444; width: 100%; } /* HP（赤） */
+  
+  .label { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; text-shadow: 0 1px 2px black; font-weight: bold; }
+
+  /* メインエリア（弾幕フィールド） */
+  #field { flex: 1; position: relative; overflow: hidden; }
+  
+  /* 弾幕（言葉） */
+  .word { position: absolute; padding: 8px 12px; background: #fff; color: #000; border-radius: 20px; font-weight: bold; font-size: 14px; border: 2px solid #ef4444; cursor: pointer; user-select: none; white-space: nowrap; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transform: translateX(-50%); }
+  .word.destroyed { transform: translateX(-50%) scale(1.5); opacity: 0; transition: 0.2s; pointer-events: none; }
+
+  /* フッター（操作部） */
+  #footer { padding: 20px; background: #111; text-align: center; z-index: 10; }
+  #attackBtn { width: 100%; max-width: 300px; padding: 20px; font-size: 24px; font-weight: bold; border: none; border-radius: 12px; background: #3b82f6; color: white; box-shadow: 0 6px 0 #1d4ed8; active:translateY(4px); active:box-shadow: 0 2px 0 #1d4ed8; touch-action: manipulation; }
+  #attackBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1d4ed8; }
+
+  /* エフェクト */
+  .effect { position: absolute; font-weight: bold; font-size: 20px; color: #fbbf24; pointer-events: none; animation: floatUp 0.5s forwards; }
+  @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-30px); } }
+
+  /* ゲームオーバー/クリア */
+  #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; display: none; }
+  button.retry { padding: 12px 24px; font-size: 18px; cursor: pointer; background: #fff; border: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div id="gameArea">
+  <div id="header">
+    <div class="enemyIcon">👵</div>
+    <div style="flex:1">
+      <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+        <span>説得度</span>
+        <span id="persuadeVal">0%</span>
+      </div>
+      <div class="barWrap"><div id="persuadeBar" class="bar"></div></div>
+    </div>
+  </div>
+
+  <div id="field">
+    <!-- 弾幕がここに生成される -->
+  </div>
+
+  <div style="padding: 10px; background: #222;">
+    <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+      <span>メンタル (HP)</span>
+      <span id="hpVal">100%</span>
+    </div>
+    <div class="barWrap"><div id="hpBar" class="bar"></div></div>
+  </div>
+
+  <div id="footer">
+    <button id="attackBtn">説得する！(連打)</button>
+  </div>
+
+  <div id="overlay">
+    <h1 id="resultTitle" style="margin-bottom:10px;"></h1>
+    <div id="resultDesc" style="color:#ccc"></div>
+    <button class="retry" onclick="location.reload()">もう一度</button>
+  </div>
+</div>
+<script src="battle_demo.js"></script>
+</body>
+</html>
