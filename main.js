@@ -45,9 +45,9 @@ const oreoreTactics = [
 ];
 
 const personnel = [
-  { id: "nogami", name: "ノガミ", role: "リーダー", age: "20代後半", text: "主人公。四大卒。アコウの紹介でグループに参加した。" },
-  { id: "taki", name: "タキ", role: "元リーダー", age: "30代前半", text: "元リーダー。四大卒。アコウと共にグループを創設した。感情的になりやすく、よくアジトを飛び出す。" },
-  { id: "akou", name: "アコウ", role: "サブリーダー", age: "30代前半", text: "サブリーダー。博士課程満期退学。タキと共にグループを創設した。タキとは意見が合わないことが多い。" },
+  { id: "nogami", name: "ノガミ", role: "リーダー", age: "20代後半", text: "主人公。四大卒。金融機関出身。アコウの紹介でグループに参加した。" },
+  { id: "taki", name: "タキ", role: "元リーダー", age: "30代前半", text: "元リーダー。四大卒。金融機関出身。アコウと共にグループを創設した。感情的になりやすく、よくアジトを飛び出す。" },
+  { id: "akou", name: "アコウ", role: "サブリーダー", age: "30代前半", text: "サブリーダー。金融機関出身。博士課程満期退学。タキと共にグループを創設した。タキとは意見が合わないことが多い。" },
 ];
 
 const baseLevels = [
@@ -73,7 +73,9 @@ const defaultState = {
   wallet: 0, // 所持金（累計）
   orgLevel: 1, // ★追加
   storyOpen: null, // "main" or "sub"
+  docTab: "story", // "story" or "guide"
   storyPlaying: null, // 再生中のストーリーID
+  guideViewing: null, // 解説表示中のID
   storyIndex: 0,      // 現在の台詞インデックス
   recruitOpen: false, // 人事リストの開閉
   viewingMember: null, // 詳細表示中のメンバーID
@@ -148,6 +150,7 @@ function render(){
   if (state.tab === "base") return renderBase();
   if (state.tab === "story") {
     if (state.storyPlaying) return renderStoryPlayer();
+    if (state.guideViewing) return renderGuideViewer();
     return renderStory();
   }
 
@@ -267,7 +270,7 @@ function renderRecruit() {
   
   const body = `
     <div class="storyHeader" id="recruitListHeader">
-      <div>メンバーリスト</div>
+      <div>登場人物</div>
       <div style="font-size:12px; color:#9aa0c5">${isOpen ? "▲" : "▼"}</div>
     </div>
     ${isOpen ? `<div style="margin-top:10px">${renderChoices(personnel, null, "viewMember", "list")}</div>` : ""}
@@ -287,15 +290,15 @@ function renderMemberDetail() {
 
   const body = `
     <div style="margin-bottom:16px">
-      <button class="btn" id="backToRecruit" style="padding:6px 12px; font-size:12px">← リストに戻る</button>
+      <button class="btn" id="backToRecruit" style="padding:6px 12px; font-size:12px">リストに戻る</button>
     </div>
     <div class="card" style="background:#0f1320; border:none;">
       <div class="h1">${m.name}</div>
-      <div class="pill" style="margin-top:0">${m.role}</div>
-      <div class="p" style="margin-top:12px; color:#e8e9ee;">${m.text}</div>
-      <div class="row" style="margin-top:20px; border-top:1px solid #242836; padding-top:10px;">
-        <div class="p">年齢: ${m.age}</div>
+      <div style="display:flex; gap:8px; margin-top:0">
+        <div class="pill" style="margin-top:0">${m.role}</div>
+        <div class="pill" style="margin-top:0">${m.age}</div>
       </div>
+      <div class="p" style="margin-top:12px; color:#e8e9ee;">${m.text}</div>
     </div>
   `;
   screen.innerHTML = card("メンバー詳細", body);
@@ -367,26 +370,52 @@ function renderBase(){
 
 // ストーリー画面
 function renderStory() {
-  const isOpenMain = state.storyOpen === "main";
-  const isOpenSub = state.storyOpen === "sub";
+  const isStory = state.docTab === "story";
+  const isGuide = state.docTab === "guide";
 
-  const body = `
-    <div class="storyHeader" data-cat="main">
-      <div>メインストーリー</div>
-      <div style="font-size:12px; color:#9aa0c5">${isOpenMain ? "▲" : "▼"}</div>
-    </div>
-    ${isOpenMain ? `<div style="margin-top:10px">${renderChoices(stories.main, null, "readMain", "list")}</div>` : ""}
-    
-    <div style="height:10px"></div>
+  // タブボタンのスタイル（非アクティブ時は暗くする）
+  const btnStyle = (active) => active 
+    ? `flex:1;` 
+    : `flex:1; background:transparent; border:1px solid #333; color:#888;`;
 
-    <div class="storyHeader" data-cat="sub">
-      <div>サブストーリー</div>
-      <div style="font-size:12px; color:#9aa0c5">${isOpenSub ? "▲" : "▼"}</div>
+  const tabHtml = `
+    <div class="row" style="margin-bottom:20px; gap:10px;">
+      <button class="btn" style="${btnStyle(isStory)}" data-doctab="story">ストーリー</button>
+      <button class="btn" style="${btnStyle(isGuide)}" data-doctab="guide">手口解説</button>
     </div>
-    ${isOpenSub ? `<div style="margin-top:10px">${renderChoices(stories.sub, null, "readSub", "list")}</div>` : ""}
   `;
 
-  screen.innerHTML = card("ストーリー", body);
+  let contentHtml = "";
+
+  if (isStory) {
+    const isOpenMain = state.storyOpen === "main";
+    const isOpenSub = state.storyOpen === "sub";
+    
+    contentHtml = `
+      <div class="storyHeader" data-cat="main">
+        <div>メインストーリー</div>
+        <div style="font-size:12px; color:#9aa0c5">${isOpenMain ? "▲" : "▼"}</div>
+      </div>
+      ${isOpenMain ? `<div style="margin-top:10px">${renderChoices(stories.main, null, "readMain", "list")}</div>` : ""}
+      
+      <div style="height:10px"></div>
+
+      <div class="storyHeader" data-cat="sub">
+        <div>サブストーリー</div>
+        <div style="font-size:12px; color:#9aa0c5">${isOpenSub ? "▲" : "▼"}</div>
+      </div>
+      ${isOpenSub ? `<div style="margin-top:10px">${renderChoices(stories.sub, null, "readSub", "list")}</div>` : ""}
+    `;
+  } else {
+    // 手口解説
+    contentHtml = `
+      <div class="p" style="margin-bottom:10px; color:#9aa0c5; font-size:13px;">
+      </div>
+      ${renderChoices(stories.guide, null, "readGuide", "list")}
+    `;
+  }
+
+  screen.innerHTML = card("資料", tabHtml + contentHtml);
 }
 
 // ストーリー再生（ノベルパート）
@@ -406,7 +435,7 @@ function renderStoryPlayer(){
   const body = `
     <div class="storyView">
       <div style="margin-bottom:auto">
-        <button class="btn" id="quitStoryBtn" style="padding:6px 12px; font-size:12px">← ストーリーに戻る</button>
+        <button class="btn" id="quitStoryBtn" style="padding:6px 12px; font-size:12px">ストーリーに戻る</button>
       </div>
       <div class="storyBubble">
         ${line.speaker ? `<div class="storyName">${line.speaker}</div>` : ""}
@@ -416,6 +445,36 @@ function renderStoryPlayer(){
     </div>
   `;
   screen.innerHTML = body;
+}
+
+// 手口解説ビューアー（静的表示）
+function renderGuideViewer() {
+  const script = storyScripts[state.guideViewing];
+  const guideItem = stories.guide.find(g => g.id === state.guideViewing);
+  
+  if (!script) {
+    state.guideViewing = null;
+    render();
+    return;
+  }
+
+  const contentHtml = script.map(line => `<p class="p" style="margin-bottom:1em;">${line.text}</p>`).join("");
+
+  const body = `
+    <div style="margin-bottom:16px">
+      <button class="btn" id="closeGuideBtn" style="padding:6px 12px; font-size:12px">一覧に戻る</button>
+    </div>
+    <div class="card" style="background:#0f1320; border:none;">
+      <div class="h1" style="margin-bottom:16px;">${guideItem ? guideItem.name : "解説"}</div>
+      <div style="color:#e8e9ee; line-height:1.6;">${contentHtml}</div>
+    </div>
+  `;
+  screen.innerHTML = card("資料詳細", body);
+
+  document.getElementById("closeGuideBtn").addEventListener("click", () => {
+    state.guideViewing = null;
+    render();
+  });
 }
 
 // Step 1: 案件選択
@@ -760,6 +819,13 @@ screen.addEventListener("pointerup", (e)=> {
     return;
   }
 
+  // 資料タブ切り替え
+  if (e.target.closest("[data-doctab]")) {
+    state.docTab = e.target.closest("[data-doctab]").dataset.doctab;
+    render();
+    return;
+  }
+
   // ストーリーヘッダー判定
   const header = e.target.closest(".storyHeader");
   if (header) {
@@ -788,7 +854,16 @@ screen.addEventListener("pointerup", (e)=> {
     render();
   }
   
-  if (on === "readMain") {
+  if (on === "readGuide") {
+    if (storyScripts[id]) {
+      state.guideViewing = id;
+      render();
+    } else {
+      alert("この解説はまだ実装されていません。");
+    }
+  }
+  
+  if (on === "readMain" || on === "readSub") {
     if (storyScripts[id]) {
       state.storyPlaying = id;
       state.storyIndex = 0;
