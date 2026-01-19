@@ -148,6 +148,7 @@ function render(){
   if (state.tab === "home") return renderHomeNew();
   if (state.tab === "recruit") return renderRecruit();
   if (state.tab === "base") return renderBase();
+  if (state.tab === "battle") return renderBattle();
   if (state.tab === "story") {
     if (state.storyPlaying) return renderStoryPlayer();
     if (state.guideViewing) return renderGuideViewer();
