@@ -45,8 +45,24 @@ const oreoreTactics = [
 ];
 
 const personnel = [
-  { id: "nogami", name: "ノガミ", role: "リーダー", age: "20代後半", text: "主人公。四大卒。金融機関出身。アコウの紹介でグループに参加した。" },
-  { id: "taki", name: "タキ", role: "元リーダー", age: "30代前半", text: "元リーダー。四大卒。金融機関出身。アコウと共にグループを創設した。感情的になりやすく、よくアジトを飛び出す。" },
+  { 
+    id: "nogami", 
+    name: "ノガミ", 
+    role: "リーダー", 
+    age: "20代後半", 
+    text: "主人公。四大卒。金融機関出身。アコウの紹介でグループに参加した。", 
+    image: "assets/nogami.png",
+    stats: { hp: 6, mp: 9, atk: 6, def: 5, spd: 5, spc: 5 }
+  },
+  { 
+    id: "taki", 
+    name: "タキ", 
+    role: "元リーダー", 
+    age: "30代前半", 
+    text: "元リーダー。四大卒。金融機関出身。アコウと共にグループを創設した。感情的になりやすく、よくアジトを飛び出す。", 
+    image: "assets/taki.png",
+    stats: { hp: 8, mp: 6, atk: 6, def: 7, spd: 5, spc: 4 }
+  },
   { id: "akou", name: "アコウ", role: "サブリーダー", age: "30代前半", text: "サブリーダー。金融機関出身。博士課程満期退学。タキと共にグループを創設した。タキとは意見が合わないことが多い。" },
 ];
 
@@ -127,11 +143,16 @@ function card(title, bodyHtml){
 function renderChoices(items, selectedId, onClickName, containerClass = "row"){
   const html = items.map(it => {
     const meta = it.desc ?? (it.level !== undefined ? `Lv.${it.level}` : "");
+    const imgHtml = it.image ? `<img src="${it.image}" style="width:40px; height:40px; object-fit:contain; background:#1a1e2e; border-radius:4px; border:1px solid #333; margin-right:10px;">` : "";
+
     return `
-    <div class="choice ${selectedId===it.id ? "selected":""}" data-id="${it.id}" data-on="${onClickName}">
-      <div class="name">${it.name}</div>
-      ${meta ? `<div class="meta">${meta}</div>` : ""}
-      ${it.level ? `<div class="meta">レベル: <b style="color:#e8e9ee">Lv.${it.level}</b></div>` : ``}
+    <div class="choice ${selectedId===it.id ? "selected":""}" data-id="${it.id}" data-on="${onClickName}" style="display:flex; align-items:center; text-align:left;">
+      ${imgHtml}
+      <div style="flex:1">
+        <div class="name">${it.name}</div>
+        ${meta ? `<div class="meta">${meta}</div>` : ""}
+        ${it.level ? `<div class="meta">レベル: <b style="color:#e8e9ee">Lv.${it.level}</b></div>` : ``}
+      </div>
     </div>
   `}).join("");
   return `<div class="${containerClass}">${html}</div>`;
@@ -289,20 +310,55 @@ function renderMemberDetail() {
     return;
   }
 
+  let statsHtml = "";
+  if (m.stats) {
+    const labels = { hp:"体力", mp:"精神力", atk:"攻撃力", def:"守備力", spd:"速度", spc:"特殊" };
+    const keys = ["hp", "mp", "atk", "def", "spd", "spc"];
+    
+    const rows = keys.map(key => {
+      const val = m.stats[key];
+      const label = labels[key];
+      // 最大値10としてバーの長さを計算
+      const percent = Math.min(100, (val / 10) * 100);
+      return `
+        <div style="display:flex; align-items:center; margin-bottom:6px; font-size:12px;">
+          <div style="width:50px; color:#aaa;">${label}</div>
+          <div style="width:20px; text-align:right; margin-right:8px; font-weight:bold;">${val}</div>
+          <div style="flex:1; background:#333; height:6px; border-radius:3px; overflow:hidden;">
+            <div style="width:${percent}%; background:#60a5fa; height:100%;"></div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    statsHtml = `
+      <div style="margin-top:16px; background:#1a1e2e; padding:12px; border-radius:8px;">
+        <div style="font-size:13px; font-weight:bold; margin-bottom:8px; color:#ccc;">ステータス</div>
+        ${rows}
+      </div>
+    `;
+  }
+
   const body = `
     <div style="margin-bottom:16px">
       <button class="btn" id="backToRecruit" style="padding:6px 12px; font-size:12px">リストに戻る</button>
     </div>
     <div class="card" style="background:#0f1320; border:none;">
-      <div class="h1">${m.name}</div>
-      <div style="display:flex; gap:8px; margin-top:0">
-        <div class="pill" style="margin-top:0">${m.role}</div>
-        <div class="pill" style="margin-top:0">${m.age}</div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <div class="h1" style="margin-bottom:8px;">${m.name}</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div class="pill" style="margin-top:0">${m.role}</div>
+            <div class="pill" style="margin-top:0">${m.age}</div>
+          </div>
+        </div>
+        ${m.image ? `<img src="${m.image}" style="width:100px; height:100px; object-fit:contain; background:#1a1e2e; border-radius:8px; border:1px solid #333;">` : ""}
       </div>
       <div class="p" style="margin-top:12px; color:#e8e9ee;">${m.text}</div>
+      ${statsHtml}
     </div>
   `;
-  screen.innerHTML = card("メンバー詳細", body);
+  screen.innerHTML = card("人物詳細", body);
   
   document.getElementById("backToRecruit").addEventListener("click", () => {
     state.viewingMember = null;

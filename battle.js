@@ -19,37 +19,61 @@ function card(title, bodyHtml){
   `;
 }
 
-// バトル開始（テスト用）
-function startBattleTest() {
-  // テスト用キャラクターデータ
+// ステージデータ定義
+const STAGES = [
+  { id: 1, name: "路地裏のチンピラ", enemy: { name: "チンピラ", hp: 50, maxHp: 50, atk: 12, def: 1, image: "assets/enemy.png" } },
+  { id: 2, name: "組織の用心棒", enemy: { name: "用心棒", hp: 80, maxHp: 80, atk: 16, def: 3, image: "assets/enemy.png" } },
+  { id: 3, name: "タキ", enemy: { name: "タキ", hp: 120, maxHp: 120, atk: 22, def: 5, image: "assets/taki.png" } }
+];
+
+// バトル開始
+function startBattle(stage) {
+  // 味方データ
   battleState.ally = { name: "ノガミ", hp: 100, maxHp: 100, atk: 20, def: 5, image: "assets/nogami.png" };
-  battleState.enemy = { name: "チンピラ", hp: 80, maxHp: 80, atk: 15, def: 2, image: "assets/enemy.png" };
+  
+  // 敵データ（ステージ情報からコピー）
+  battleState.enemy = { ...stage.enemy };
   
   battleState.logs = [`${battleState.enemy.name} が現れた！`];
   battleState.turn = "player";
   battleState.active = true;
 
-  // main.js の state を操作して画面切り替え
+  // 画面更新
   state.tab = "battle";
   render();
 }
 
 // バトル画面の描画
 function renderBattle() {
-  // バトル未開始時の表示
+  // バトル未開始時の表示（ステージ選択）
   if (!battleState.active) {
+    const stagesHtml = STAGES.map(s => `
+      <div class="card" style="margin-top:10px; background:#1a1e2e; border:1px solid #333; padding:12px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-weight:bold; font-size:14px;">ステージ${s.id}: ${s.name}</div>
+          <div style="font-size:12px; color:#aaa;">敵: ${s.enemy.name}</div>
+        </div>
+        <button class="btn stage-btn" data-id="${s.id}" style="width:80px; flex:none; padding:8px 0; font-size:12px; background:linear-gradient(135deg, #ef4444, #b91c1c); border:none;">開始</button>
+      </div>
+    `).join("");
+
     const body = `
-      <div style="text-align:center; padding:20px;">
-        <div style="font-size:60px; margin-bottom:16px;">⚔️</div>
-        <div class="p" style="margin-bottom:24px;">路地裏でチンピラに絡まれるかもしれない。</div>
-        <button class="btn" id="startBattleBtn" style="background:linear-gradient(135deg, #ef4444, #b91c1c); border:none;">
-          戦闘を開始する
-        </button>
+      <div style="padding-bottom:20px;">
+        <div class="p">挑戦するステージを選択してください。</div>
+        ${stagesHtml}
       </div>
     `;
     const screen = document.getElementById("screen");
-    screen.innerHTML = card("バトル", body);
-    document.getElementById("startBattleBtn").onclick = startBattleTest;
+    screen.innerHTML = card("戦闘ステージ選択", body);
+    
+    // ステージ選択ボタンのイベント
+    document.querySelectorAll(".stage-btn").forEach(btn => {
+      btn.onclick = () => {
+        const id = parseInt(btn.dataset.id);
+        const stage = STAGES.find(s => s.id === id);
+        if(stage) startBattle(stage);
+      };
+    });
     return;
   }
 
